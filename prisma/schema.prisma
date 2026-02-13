@@ -29,18 +29,81 @@ enum TaskType {
   RESEARCH
 }
 
+enum ReadinessStatus {
+  PENDING
+  PASSED
+  FAILED
+}
+
 model Task {
-  id             String       @id @default(cuid())
+  id             String              @id @default(cuid())
   title          String
-  type           TaskType     @default(CHORE)
-  priority       TaskPriority @default(MEDIUM)
-  status         TaskStatus   @default(INBOX)
+  type           TaskType            @default(CHORE)
+  priority       TaskPriority        @default(MEDIUM)
+  status         TaskStatus          @default(INBOX)
   owner          String?
   deadline       DateTime?
   context        String?
   expectedOutput String?
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
+  templateId     String?
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+
+  template        TaskTemplate?       @relation(fields: [templateId], references: [id])
+  readinessChecks TaskReadinessCheck[]
+}
+
+model TaskTemplate {
+  id                    String                         @id @default(cuid())
+  key                   String                         @unique
+  name                  String
+  description           String?
+  defaultType           TaskType                       @default(CHORE)
+  defaultPriority       TaskPriority                   @default(MEDIUM)
+  defaultStatus         TaskStatus                     @default(INBOX)
+  defaultOwner          String?
+  defaultContext        String?
+  defaultExpectedOutput String?
+  isActive              Boolean                        @default(true)
+  createdAt             DateTime                       @default(now())
+  updatedAt             DateTime                       @updatedAt
+
+  readinessChecks TaskTemplateReadinessCheck[]
+  tasks           Task[]
+}
+
+model TaskTemplateReadinessCheck {
+  id         String       @id @default(cuid())
+  templateId String
+  code       String
+  label      String
+  helpText   String?
+  required   Boolean      @default(true)
+  order      Int
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+
+  template TaskTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@unique([templateId, code])
+  @@index([templateId, order])
+}
+
+model TaskReadinessCheck {
+  id        String          @id @default(cuid())
+  taskId     String
+  code      String
+  label     String
+  required  Boolean         @default(true)
+  status    ReadinessStatus @default(PENDING)
+  note      String?
+  checkedAt DateTime?
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([taskId])
 }
 
 model Agent {

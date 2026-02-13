@@ -16,6 +16,12 @@ type Task = {
   deadline: string | null;
   context: string | null;
   expectedOutput: string | null;
+  readiness?: {
+    state: "READY" | "NOT_READY" | "NOT_APPLICABLE";
+    requiredTotal: number;
+    requiredPassed: number;
+    total: number;
+  };
   createdAt: string;
   updatedAt: string;
 };
@@ -28,6 +34,12 @@ type Agent = {
   blocker: string | null;
   nextStep: string | null;
   lastUpdate: string;
+};
+
+type TaskTemplate = {
+  id: string;
+  key: string;
+  name: string;
 };
 
 const statusColumns: { status: TaskStatus; label: string; hint: string }[] = [
@@ -51,14 +63,22 @@ function formatDate(value: string | null) {
   });
 }
 
+function readinessLabel(task: Task) {
+  if (!task.readiness) return null;
+  if (task.readiness.state === "NOT_APPLICABLE") return "Ready: n/a";
+  return `Ready: ${task.readiness.requiredPassed}/${task.readiness.requiredTotal}`;
+}
+
 export default function Home() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [agents, setAgents] = useState<Agent[]>([]);
+  const [templates, setTemplates] = useState<TaskTemplate[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const [draftTask, setDraftTask] = useState({
     title: "",
+    templateKey: "",
     type: "FEATURE" as TaskType,
     priority: "MEDIUM" as TaskPriority,
     status: "INBOX" as TaskStatus,
@@ -71,22 +91,25 @@ export default function Home() {
   async function loadData() {
     try {
       setError(null);
-      const [taskRes, agentRes] = await Promise.all([
+      const [taskRes, agentRes, templateRes] = await Promise.all([
         fetch("/api/tasks", { cache: "no-store" }),
         fetch("/api/agents", { cache: "no-store" }),
+        fetch("/api/task-templates", { cache: "no-store" }),
       ]);
 
-      if (!taskRes.ok || !agentRes.ok) {
+      if (!taskRes.ok || !agentRes.ok || !templateRes.ok) {
         throw new Error("Failed to load board data");
       }
 
-      const [taskData, agentData] = await Promise.all([
+      const [taskData, agentData, templateData] = await Promise.all([
         taskRes.json() as Promise<Task[]>,
         agentRes.json() as Promise<Agent[]>,
+        templateRes.json() as Promise<TaskTemplate[]>,
       ]);
 
       setTasks(taskData);
       setAgents(agentData);
+      setTemplates(templateData);
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "Unknown error");
     } finally {
@@ -125,6 +148,7 @@ export default function Home() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         ...draftTask,
+        templateKey: draftTask.templateKey || null,
         owner: draftTask.owner || null,
         deadline: draftTask.deadline || null,
         context: draftTask.context || null,
@@ -133,12 +157,14 @@ export default function Home() {
     });
 
     if (!response.ok) {
-      setError("Task creation failed. Please retry.");
+      const payload = (await response.json().catch(() => null)) as { error?: string } | null;
+      setError(payload?.error || "Task creation failed. Please retry.");
       return;
     }
 
     setDraftTask({
       title: "",
+      templateKey: "",
       type: "FEATURE",
       priority: "MEDIUM",
       status: "INBOX",
@@ -159,7 +185,12 @@ export default function Home() {
     });
 
     if (!response.ok) {
-      setError("Task update failed.");
+      const payload = (await response.json().catch(() => null)) as { error?: string; code?: string } | null;
+      if (payload?.code === "TASK_NOT_READY") {
+        setError("Task is not ready: complete required readiness checks first.");
+      } else {
+        setError(payload?.error || "Task update failed.");
+      }
       return;
     }
 
@@ -230,6 +261,21 @@ export default function Home() {
                   onChange={(event) => setDraftTask((prev) => ({ ...prev, title: event.target.value }))}
                   placeholder="Implement agent timeline view"
                 />
+              </label>
+
+              <label className="field">
+                <span>Template (optional)</span>
+                <select
+                  value={draftTask.templateKey}
+                  onChange={(event) => setDraftTask((prev) => ({ ...prev, templateKey: event.target.value }))}
+                >
+                  <option value="">No template</option>
+                  {templates.map((template) => (
+                    <option key={template.id} value={template.key}>
+                      {template.name}
+                    </option>
+                  ))}
+                </select>
               </label>
 
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -359,6 +405,9 @@ export default function Home() {
                           {task.owner ? ` • ${task.owner}` : ""}
                         </p>
                         <p className="mt-1 text-xs text-[var(--muted)]">Due: {formatDate(task.deadline)}</p>
+                        {task.readiness ? (
+                          <p className="mt-1 text-xs text-[var(--muted)]">{readinessLabel(task)}</p>
+                        ) : null}
                         {task.expectedOutput ? (
                           <p className="mt-2 rounded-md bg-[var(--bg)] p-2 text-xs text-[var(--muted)]">
                             <strong className="text-[var(--fg)]">Output:</strong> {task.expectedOutput}
