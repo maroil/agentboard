@@ -2,95 +2,75 @@
 
 Modern operations dashboard for managing tasks and execution agents.
 
-## Overnight Sprint Changelog (2026-02-13)
+## Stack
 
-- Redesigned entire UI/UX with a polished, responsive operations dashboard.
-- Added richer task creation fields (type, priority, status, owner, deadline, context, expected output).
-- Upgraded API reliability with stricter validation + defensive error handling.
-- Added task deletion endpoint and hooked it into UI.
-- Improved agent panel with inline blocker/next-step updates.
-- Restored Prisma `6.19.x` line and aligned seed/runtime usage.
-- Added Dockerfile-first deployment flow for Coolify (deterministic Node `22.14.0`).
-- Added production start command that runs Prisma migrations on boot.
+- **Frontend/API**: Next.js App Router
+- **ORM**: Prisma
+- **Database**: PostgreSQL (persistent)
 
-## Architecture
-
-- **Frontend**: Next.js App Router (`src/app/page.tsx`) + Tailwind v4 styles.
-- **Backend APIs**: Next.js Route Handlers under `src/app/api`.
-- **Database**: Prisma ORM using SQLite by default (`prisma/dev.db`) via `DATABASE_URL`.
-- **Data model**: `Task` + `Agent` entities in `prisma/schema.prisma`.
-
-## Environment Variables
+## Environment
 
 Create `.env`:
 
 ```bash
-DATABASE_URL="file:./dev.db"
+DATABASE_URL="postgresql://postgres:postgres@localhost:5432/agentboard?schema=public"
 ```
 
-For external DBs, provide a Prisma-compatible URL and run migrations.
-
-## Local Development
+## Local development
 
 ```bash
 npm install
 npx prisma generate
-npx prisma migrate dev
+npx prisma migrate deploy
+npm run prisma:seed
 npm run dev
 ```
 
-Open `http://localhost:3000`.
+## Production startup flow
 
-## Quality Gate (before push/deploy)
+`npm run start:prod` now does:
+
+1. `prisma migrate deploy`
+2. `prisma db seed`
+3. `next start`
+
+This guarantees schema + minimal starter data exist on each boot (idempotent).
+
+## Starter board behavior
+
+If task table is empty, app seeds a minimal board:
+
+- 1 parent task: **Lancer AgentBoard en production**
+- 3 subtasks linked via `parentId`
+
+If agents table is empty, 2 default agents are inserted.
+
+## Docker / Coolify deploy
+
+- Build from repo root using `Dockerfile`
+- Expose port `3000`
+- Required env var: `DATABASE_URL` (PostgreSQL)
+- Attach a persistent PostgreSQL service in Coolify and inject its connection string into app env
+
+### Recommended Coolify steps
+
+1. Create/attach PostgreSQL resource to the app.
+2. Set `DATABASE_URL` to the resource URI (`?schema=public`).
+3. Redeploy app.
+4. Validate:
+   - `GET /api/tasks` returns 200
+   - `GET /api/agents` returns 200
+   - Create a task, redeploy, verify task still exists.
+
+## Quality gate before push/deploy
 
 ```bash
 npm run lint
 npm run build
 ```
 
-Then run app locally and validate:
+Then smoke test locally:
 
-- Task creation with all fields
-- Task status transitions across columns
-- Task deletion
-- Agent status / blocker / next step updates
-- Browser console free of runtime errors
-
-## Docker Deployment (Coolify-ready)
-
-This repo is now Dockerfile-based (no Nixpacks).
-
-- Build context root: repository root
-- Dockerfile: `./Dockerfile`
-- Exposed port: `3000`
-- Startup command (inside image): `npm run start:prod`
-- On startup: `prisma migrate deploy` runs before `next start`
-
-Build locally:
-
-```bash
-docker build -t agentboard:local .
-docker run --rm -p 3000:3000 -e DATABASE_URL="file:./dev.db" agentboard:local
-```
-
-## Troubleshooting
-
-### Prisma client errors at runtime
-
-Run:
-
-```bash
-npx prisma generate
-```
-
-### Migration issues in production
-
-Ensure `DATABASE_URL` is valid and reachable from container, then re-run deploy.
-
-### App boots but no data
-
-The app auto-seeds initial data if task table is empty. You can also run:
-
-```bash
-npm run prisma:seed
-```
+- API: `/api/tasks`, `/api/agents`
+- Create task and reload
+- No browser console runtime errors on tested flows

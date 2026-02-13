@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
@@ -46,11 +46,17 @@ model Task {
   context        String?
   expectedOutput String?
   templateId     String?
+  parentId       String?
   createdAt      DateTime            @default(now())
   updatedAt      DateTime            @updatedAt
 
   template        TaskTemplate?       @relation(fields: [templateId], references: [id])
+  parent          Task?               @relation("TaskSubtasks", fields: [parentId], references: [id], onDelete: SetNull)
+  subtasks        Task[]              @relation("TaskSubtasks")
   readinessChecks TaskReadinessCheck[]
+
+  @@index([templateId])
+  @@index([parentId])
 }
 
 model TaskTemplate {
@@ -91,7 +97,7 @@ model TaskTemplateReadinessCheck {
 
 model TaskReadinessCheck {
   id        String          @id @default(cuid())
-  taskId     String
+  taskId    String
   code      String
   label     String
   required  Boolean         @default(true)

@@ -86,79 +86,77 @@ async function seedTemplates() {
   }
 }
 
+async function seedStarterBoardIfEmpty() {
+  const taskCount = await prisma.task.count();
+  if (taskCount > 0) return;
+
+  const parent = await prisma.task.create({
+    data: {
+      title: "Lancer AgentBoard en production",
+      type: TaskType.FEATURE,
+      priority: TaskPriority.HIGH,
+      status: TaskStatus.INBOX,
+      owner: "Ops",
+      context: "Board minimal initial après migration PostgreSQL",
+      expectedOutput: "Board prêt avec un flux initial",
+    },
+  });
+
+  await prisma.task.createMany({
+    data: [
+      {
+        title: "Configurer la base PostgreSQL dans Coolify",
+        type: TaskType.CHORE,
+        priority: TaskPriority.HIGH,
+        status: TaskStatus.NEXT,
+        owner: "Ops",
+        parentId: parent.id,
+      },
+      {
+        title: "Valider les endpoints API en production",
+        type: TaskType.CHORE,
+        priority: TaskPriority.MEDIUM,
+        status: TaskStatus.NEXT,
+        owner: "QA",
+        parentId: parent.id,
+      },
+      {
+        title: "Documenter le runbook de déploiement",
+        type: TaskType.CHORE,
+        priority: TaskPriority.MEDIUM,
+        status: TaskStatus.INBOX,
+        owner: "Tech Lead",
+        parentId: parent.id,
+      },
+    ],
+  });
+}
+
+async function seedAgentsIfEmpty() {
+  const existingAgents = await prisma.agent.count();
+  if (existingAgents > 0) return;
+
+  await prisma.agent.createMany({
+    data: [
+      {
+        name: "Planner Agent",
+        mission: "Break incoming requests into actionable tasks",
+        status: "Active",
+        nextStep: "Refine priorities for Sprint Backlog",
+      },
+      {
+        name: "Builder Agent",
+        mission: "Implement approved sprint tasks",
+        status: "Blocked",
+        blocker: "Awaiting API schema confirmation",
+        nextStep: "Resume UI hooks after schema finalization",
+      },
+    ],
+  });
+}
+
 export async function ensureSeedData() {
-  if (process.env.NODE_ENV === "production") {
-    return;
-  }
-
   await seedTemplates();
-
-  const [existingTasks, existingAgents] = await Promise.all([
-    prisma.task.count(),
-    prisma.agent.count(),
-  ]);
-
-  const operations = [];
-
-  if (existingTasks === 0) {
-    operations.push(
-      prisma.task.createMany({
-        data: [
-          {
-            title: "Define MVP dashboard scope",
-            type: TaskType.RESEARCH,
-            priority: TaskPriority.HIGH,
-            status: TaskStatus.INBOX,
-            owner: "Product",
-            context: "Collect must-have vs nice-to-have views",
-            expectedOutput: "One-page MVP feature checklist",
-          },
-          {
-            title: "Wire API contracts for task state updates",
-            type: TaskType.FEATURE,
-            priority: TaskPriority.URGENT,
-            status: TaskStatus.DOING,
-            owner: "Backend",
-            context: "Align status enums across frontend/backend",
-            expectedOutput: "Stable PATCH endpoints",
-          },
-          {
-            title: "Fix board empty state copy",
-            type: TaskType.BUG,
-            priority: TaskPriority.MEDIUM,
-            status: TaskStatus.NEXT,
-            owner: "Frontend",
-            context: "Clarify CTA for first task",
-            expectedOutput: "User-friendly first-run guidance",
-          },
-        ],
-      }),
-    );
-  }
-
-  if (existingAgents === 0) {
-    operations.push(
-      prisma.agent.createMany({
-        data: [
-          {
-            name: "Planner Agent",
-            mission: "Break incoming requests into actionable tasks",
-            status: "Active",
-            nextStep: "Refine priorities for Sprint Backlog",
-          },
-          {
-            name: "Builder Agent",
-            mission: "Implement approved sprint tasks",
-            status: "Blocked",
-            blocker: "Awaiting API schema confirmation",
-            nextStep: "Resume UI hooks after schema finalization",
-          },
-        ],
-      }),
-    );
-  }
-
-  if (operations.length > 0) {
-    await prisma.$transaction(operations);
-  }
+  await seedStarterBoardIfEmpty();
+  await seedAgentsIfEmpty();
 }

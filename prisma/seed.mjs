@@ -77,46 +77,61 @@ async function seedTemplates() {
   }
 }
 
-async function main() {
-  await seedTemplates();
-
+async function seedStarterBoardIfEmpty() {
   const count = await prisma.task.count();
   if (count > 0) {
-    console.log("Seed skipped for tasks: tasks already exist.");
+    console.log("Starter board skipped: tasks already exist.");
     return;
   }
+
+  const parent = await prisma.task.create({
+    data: {
+      title: "Lancer AgentBoard en production",
+      type: TaskType.FEATURE,
+      priority: TaskPriority.HIGH,
+      status: TaskStatus.INBOX,
+      owner: "Ops",
+      context: "Board minimal initial après migration PostgreSQL",
+      expectedOutput: "Board prêt avec un flux initial",
+    },
+  });
 
   await prisma.task.createMany({
     data: [
       {
-        title: "Define MVP dashboard scope",
-        type: TaskType.RESEARCH,
+        title: "Configurer la base PostgreSQL dans Coolify",
+        type: TaskType.CHORE,
         priority: TaskPriority.HIGH,
-        status: TaskStatus.INBOX,
-        owner: "Product",
-        context: "Collect must-have vs nice-to-have views",
-        expectedOutput: "One-page MVP feature checklist",
+        status: TaskStatus.NEXT,
+        owner: "Ops",
+        parentId: parent.id,
       },
       {
-        title: "Wire API contracts for task state updates",
-        type: TaskType.FEATURE,
-        priority: TaskPriority.URGENT,
-        status: TaskStatus.DOING,
-        owner: "Backend",
-        context: "Align status enums across frontend/backend",
-        expectedOutput: "Stable PATCH endpoints",
-      },
-      {
-        title: "Fix board empty state copy",
-        type: TaskType.BUG,
+        title: "Valider les endpoints API en production",
+        type: TaskType.CHORE,
         priority: TaskPriority.MEDIUM,
         status: TaskStatus.NEXT,
-        owner: "Frontend",
-        context: "Clarify CTA for first task",
-        expectedOutput: "User-friendly first-run guidance",
+        owner: "QA",
+        parentId: parent.id,
+      },
+      {
+        title: "Documenter le runbook de déploiement",
+        type: TaskType.CHORE,
+        priority: TaskPriority.MEDIUM,
+        status: TaskStatus.INBOX,
+        owner: "Tech Lead",
+        parentId: parent.id,
       },
     ],
   });
+}
+
+async function seedAgentsIfEmpty() {
+  const count = await prisma.agent.count();
+  if (count > 0) {
+    console.log("Agent seed skipped: agents already exist.");
+    return;
+  }
 
   await prisma.agent.createMany({
     data: [
@@ -135,7 +150,12 @@ async function main() {
       },
     ],
   });
+}
 
+async function main() {
+  await seedTemplates();
+  await seedStarterBoardIfEmpty();
+  await seedAgentsIfEmpty();
   console.log("Database seeded.");
 }
 

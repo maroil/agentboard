@@ -6,6 +6,8 @@ export default defineConfig({
     seed: "node prisma/seed.mjs",
   },
   datasource: {
-    url: process.env.DATABASE_URL || "file:./dev.db",
+    url:
+      process.env.DATABASE_URL ||
+      "postgresql://postgres:postgres@localhost:5432/agentboard?schema=public",
   },
 });
