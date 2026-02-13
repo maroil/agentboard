@@ -21,6 +21,15 @@ export async function GET() {
   }
 }
 
+export async function DELETE() {
+  try {
+    await prisma.task.deleteMany({});
+    return NextResponse.json({ ok: true });
+  } catch {
+    return NextResponse.json({ error: "Failed to clear tasks" }, { status: 500 });
+  }
+}
+
 export async function POST(request: Request) {
   try {
     const body = await request.json();

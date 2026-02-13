@@ -20,6 +20,15 @@ export async function GET() {
   }
 }
 
+export async function DELETE() {
+  try {
+    await prisma.agent.deleteMany({});
+    return NextResponse.json({ ok: true });
+  } catch {
+    return NextResponse.json({ error: "Failed to clear agents" }, { status: 500 });
+  }
+}
+
 export async function POST(request: Request) {
   try {
     const body = await request.json();

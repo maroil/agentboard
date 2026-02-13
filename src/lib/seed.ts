@@ -2,6 +2,10 @@ import { TaskPriority, TaskStatus, TaskType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 
 export async function ensureSeedData() {
+  if (process.env.NODE_ENV === "production") {
+    return;
+  }
+
   const existingTasks = await prisma.task.count();
 
   if (existingTasks > 0) {
