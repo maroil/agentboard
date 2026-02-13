@@ -7,19 +7,21 @@ type Params = {
 };
 
 export async function PATCH(request: Request, { params }: Params) {
-  const { id } = await params;
-  const body = await request.json();
+  try {
+    const { id } = await params;
+    const body = await request.json();
 
-  if (!Object.values(TaskStatus).includes(body?.status)) {
-    return NextResponse.json({ error: "valid status is required" }, { status: 400 });
+    if (!Object.values(TaskStatus).includes(body?.status)) {
+      return NextResponse.json({ error: "valid status is required" }, { status: 400 });
+    }
+
+    const updated = await prisma.task.update({
+      where: { id },
+      data: { status: body.status },
+    });
+
+    return NextResponse.json(updated);
+  } catch {
+    return NextResponse.json({ error: "Failed to update task status" }, { status: 500 });
   }
-
-  const updated = await prisma.task.update({
-    where: { id },
-    data: {
-      status: body.status,
-    },
-  });
-
-  return NextResponse.json(updated);
 }

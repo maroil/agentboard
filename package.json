@@ -7,15 +7,16 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "start:prod": "prisma migrate deploy && next start",
     "lint": "eslint",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:seed": "node prisma/seed.mjs"
   },
   "dependencies": {
-    "@prisma/client": "^6.16.3",
+    "@prisma/client": "^6.19.2",
     "next": "16.1.6",
-    "prisma": "^6.16.3",
+    "prisma": "^6.19.2",
     "react": "19.2.3",
     "react-dom": "19.2.3"
   },
