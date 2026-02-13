@@ -15,7 +15,7 @@ RUN npm run build
 FROM base AS runner
 ENV NODE_ENV=production
 RUN mkdir -p /app/data /app/prisma && chmod -R 777 /app/data /app/prisma
-COPY --from=deps /app/node_modules ./node_modules
+COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/.next ./.next
 COPY --from=build /app/public ./public
 COPY --from=build /app/package.json ./package.json
